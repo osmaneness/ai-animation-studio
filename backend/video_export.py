@@ -1,3 +1,4 @@
+import base64
 import json
 import shutil
 import subprocess
@@ -7,6 +8,15 @@ from uuid import uuid4
 
 
 def render_video(scenes: list[dict]) -> Path:
+    return _render_video({"scenes": scenes}, "IlkAnimasyon")
+
+
+def render_character_video(image: bytes, media_type: str, motion: str) -> Path:
+    image_url = f"data:{media_type};base64,{base64.b64encode(image).decode('ascii')}"
+    return _render_video({"imageUrl": image_url, "motion": motion}, "KarakterAnimasyonu")
+
+
+def _render_video(props: dict, composition_id: str) -> Path:
     frontend = Path(__file__).resolve().parent.parent / "frontend"
 
     entry = frontend / "app" / "RemotionRoot.tsx"
@@ -30,7 +40,7 @@ def render_video(scenes: list[dict]) -> Path:
     with tempfile.TemporaryDirectory() as temp_folder:
         props_file = Path(temp_folder) / "props.json"
         props_file.write_text(
-            json.dumps({"scenes": scenes}, ensure_ascii=False),
+            json.dumps(props, ensure_ascii=False),
             encoding="utf-8",
         )
 
@@ -41,7 +51,7 @@ def render_video(scenes: list[dict]) -> Path:
                 "remotion",
                 "render",
                 str(entry),
-                "IlkAnimasyon",
+                composition_id,
                 str(output_file),
                 "--props",
                 str(props_file),

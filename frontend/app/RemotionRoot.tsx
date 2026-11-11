@@ -1,8 +1,10 @@
 import { Composition, registerRoot } from "remotion";
 import { StoryVideo } from "./AnimationPreview";
+import { CharacterMotion, type Motion } from "./CharacterMotionPreview";
 
 function RemotionRoot() {
   return (
+    <>
     <Composition
       id="IlkAnimasyon"
       component={StoryVideo}
@@ -40,6 +42,19 @@ function RemotionRoot() {
         ],
       }}
     />
+    <Composition
+      id="KarakterAnimasyonu"
+      component={CharacterMotion}
+      durationInFrames={150}
+      fps={30}
+      width={960}
+      height={540}
+      defaultProps={{
+        imageUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1sAAAAASUVORK5CYII=",
+        motion: "slide" as Motion,
+      }}
+    />
+    </>
   );
 }
 

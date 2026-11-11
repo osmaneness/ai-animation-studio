@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AnimationPreview, { type Scene } from "./AnimationPreview";
+import CharacterDesigner from "./CharacterDesigner";
 
 type Storyboard = {
   mode: string;
@@ -122,6 +123,9 @@ export default function Home() {
           Hikâyeni yaz, ilk sahne planını oluştur.
         </p>
 
+        <CharacterDesigner />
+
+        <h2 className="mb-4 text-2xl font-bold">Robotla hikâye denemesi</h2>
         <label htmlFor="story" className="mb-3 block font-medium">
           Hikâyen
         </label>
