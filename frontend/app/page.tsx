@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import AnimationPreview from "./AnimationPreview";
-
-type Scene = {
-  id: number;
-  text: string;
-  duration_seconds: number;
-};
+import AnimationPreview, { type Scene } from "./AnimationPreview";
 
 type Storyboard = {
   mode: string;
@@ -19,8 +13,8 @@ export default function Home() {
   async function downloadVideo() {
   setError("");
 
-  if (story.trim().length < 10) {
-    setError("Lütfen en az 10 karakterlik bir hikâye yaz.");
+  if (!result) {
+    setError("Önce sahne planı oluştur ve önizlemeyi kontrol et.");
     return;
   }
 
@@ -30,7 +24,7 @@ export default function Home() {
     const response = await fetch("http://localhost:8000/render", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ story: story.trim() }),
+      body: JSON.stringify({ scenes: result.scenes }),
     });
 
     if (!response.ok) {
@@ -86,17 +80,27 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ story: story.trim() }),
+        signal: AbortSignal.timeout(35000),
       });
 
       if (!response.ok) {
-        throw new Error("Sahne planı oluşturulamadı.");
+        const data = await response.json().catch(() => null);
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : "Sahne planı oluşturulamadı. Hikâyeyi kontrol edip tekrar dene."
+        );
       }
 
       const data: Storyboard = await response.json();
       setResult(data);
-    } catch {
+    } catch (error) {
       setError(
-        "Sahne planı alınamadı. Arka sistemin açık olduğunu kontrol edip tekrar dene."
+        error instanceof Error && error.name === "TimeoutError"
+          ? "Gemini yanıtı gecikti. Biraz sonra tekrar dene."
+          : error instanceof Error && error.message !== "Failed to fetch"
+            ? error.message
+            : "Arka sisteme ulaşılamadı. Python sunucusunun açık olduğunu kontrol et."
       );
     } finally {
       setLoading(false);
@@ -125,7 +129,12 @@ export default function Home() {
         <textarea
           id="story"
           value={story}
-          onChange={(event) => setStory(event.target.value)}
+          onChange={(event) => {
+            setStory(event.target.value);
+            setResult(null);
+            setError("");
+          }}
+          disabled={loading || rendering}
           rows={5}
           maxLength={2000}
           placeholder="Küçük robot ormanda yürür. Bir tilkiyle karşılaşır. Birlikte eve dönerler."
@@ -135,28 +144,29 @@ export default function Home() {
         <button
           type="button"
           onClick={createStoryboard}
-          disabled={loading}
+          disabled={loading || rendering}
           className="mt-5 rounded-xl bg-violet-600 px-6 py-3 font-semibold hover:bg-violet-500 disabled:opacity-50"
         >
-          {loading ? "Hazırlanıyor..." : "Sahne planı oluştur"}
+          {loading ? "Gemini sahneleri hazırlıyor..." : "Sahne planı oluştur"}
         </button>
         <button
           type="button"
           onClick={downloadVideo}
-          disabled={rendering || loading}
+          disabled={rendering || loading || !result}
           className="mt-4 block rounded-xl bg-emerald-600 px-6 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-50"
         >
           {rendering ? "Video hazırlanıyor, lütfen bekle..." : "MP4 oluştur ve indir"}
         </button>
 
         <p className="mt-2 text-sm text-slate-400">
-          Yazı alanındaki güncel hikâyeyi videoya dönüştürür. En fazla 6 cümle yaz.
+          Önce sahne planını oluştur. MP4, önizlemedeki aynı sahnelerden hazırlanır.
         </p>
 
         <p className="mt-4 text-sm text-slate-400">
-          Demo: Her cümle 5 saniyelik bir sahne olur.
-          Robot animasyonunu önizleyebilir ve MP4 olarak indirebilirsin.
-          Yapay zekâ henüz bağlı değil; robot her sahnede aynı hareketi yapar.
+          Gemini hikâyeni en fazla 6 sahneye ayırır; ortamı, zamanı ve hareketi seçer.
+          Her sahne 5 saniyedir. Bu prototipte robot yürür, bekler veya zıplar;
+          diğer karakterler ve serbest hareketler henüz desteklenmez.
+          Ücretsiz API limitleri geçerlidir; denemelerde örnek hikâyeler kullan.
         </p>
 
         {error && (
@@ -188,6 +198,11 @@ export default function Home() {
                       Sahne {scene.id} · {scene.duration_seconds} saniye
                     </h3>
                     <p className="mt-2 text-slate-200">{scene.text}</p>
+                    <p className="mt-2 text-sm text-slate-400">
+                      {scene.environment === "forest" ? "Orman" : "Açık alan"}
+                      {" · "}{scene.time_of_day === "night" ? "Gece" : "Gündüz"}
+                      {" · "}{scene.action === "jump" ? "Zıplama" : scene.action === "wait" ? "Bekleme" : "Yürüme"}
+                    </p>
                   </li>
                 ))}
               </ol>

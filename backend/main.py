@@ -1,8 +1,11 @@
-import re
+from ai_director import PlanningError, plan_story
+from scene_models import StoryboardPlan
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from video_export import render_video
 
 app = FastAPI(title="AI Animation Studio")
 
@@ -15,6 +18,7 @@ app.add_middleware(
 
 
 class StoryRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
     story: str = Field(min_length=10, max_length=2000)
 
 
@@ -25,48 +29,24 @@ def health():
 
 @app.post("/storyboard")
 def create_storyboard(request: StoryRequest):
-    sentences = [
-        sentence.strip()
-        for sentence in re.split(r"[.!?]+", request.story)
-        if sentence.strip()
-    ]
-
-    scenes = [
-        {
-            "id": index + 1,
-            "text": sentence,
-            "duration_seconds": 5,
-        }
-        for index, sentence in enumerate(sentences)
-    ]
+    try:
+        plan = plan_story(request.story)
+    except PlanningError as error:
+        raise HTTPException(status_code=error.status_code, detail=str(error)) from None
+    scenes = [scene.model_dump() for scene in plan.scenes]
 
     return {
-        "mode": "demo",
+        "mode": "ai",
         "scenes": scenes,
         "total_duration_seconds": len(scenes) * 5,
     }
 
-from fastapi import HTTPException
-from fastapi.responses import FileResponse
-from video_export import render_video
-
-
 @app.post("/render")
-def create_video(request: StoryRequest):
-    storyboard = create_storyboard(request)
-    scenes = storyboard["scenes"]
-
-    if not scenes:
-        raise HTTPException(
-            status_code=400,
-            detail="Lütfen en az bir cümle yaz.",
-        )
-
-    if len(scenes) > 6:
-        raise HTTPException(
-            status_code=400,
-            detail="Bu prototipte en fazla 6 sahne oluşturabilirsin.",
-        )
+def create_video(request: StoryboardPlan):
+    # Önizlenen planı kullan; MP4 için yeniden AI isteği gönderme.
+    scenes = [scene.model_dump() for scene in request.scenes]
+    for index, scene in enumerate(scenes, start=1):
+        scene["id"] = index
 
     try:
         video_path = render_video(scenes)

@@ -9,22 +9,26 @@ import {
   useVideoConfig,
 } from "remotion";
 
-type Scene = {
+export type Scene = {
   id: number;
   text: string;
   duration_seconds: number;
+  environment?: "forest" | "plain";
+  time_of_day?: "day" | "night";
+  action?: "walk" | "wait" | "jump";
 };
 
 type Props = {
   scenes: Scene[];
 };
 
-function RobotScene({ text }: { text: string }) {
+function RobotScene({ scene }: { scene: Scene }) {
+  const text = scene.text;
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   const action = text.toLocaleLowerCase("tr-TR");
-    const jumps = action.includes("zıplar");
-    const waits = action.includes("bekler");
+    const jumps = scene.action ? scene.action === "jump" : action.includes("zıplar");
+    const waits = scene.action ? scene.action === "wait" : action.includes("bekler");
 
   const x = interpolate(
     frame,
@@ -39,8 +43,8 @@ function RobotScene({ text }: { text: string }) {
     ? 0
     : Math.sin(frame / 5) * 8;
   const words = text.toLocaleLowerCase("tr-TR");
-  const isNight = words.includes("gece");
-  const isForest = words.includes("orman");
+  const isNight = scene.time_of_day ? scene.time_of_day === "night" : words.includes("gece");
+  const isForest = scene.environment ? scene.environment === "forest" : words.includes("orman");
 
     const skyColor = isNight
     ? "#172554"
@@ -118,18 +122,18 @@ function RobotScene({ text }: { text: string }) {
 }
 
 export function StoryVideo({ scenes }: Props) {
-  let startFrame = 0;
-
   return (
     <AbsoluteFill>
-      {scenes.map((scene) => {
+      {scenes.map((scene, index) => {
         const duration = Math.max(1, Math.round(scene.duration_seconds * 30));
-        const from = startFrame;
-        startFrame += duration;
+        const from = scenes.slice(0, index).reduce(
+          (sum, previous) => sum + Math.max(1, Math.round(previous.duration_seconds * 30)),
+          0
+        );
 
         return (
           <Sequence key={scene.id} from={from} durationInFrames={duration}>
-            <RobotScene text={scene.text} />
+            <RobotScene scene={scene} />
           </Sequence>
         );
       })}
